@@ -27,14 +27,14 @@ This project detects personal protective equipment (PPE) on construction workers
 |---------|-------------|-------|--------|--------|--------|
 | v1 | 66 images | YOLOv8n | 10 | 17.1% | Baseline |
 | v2 | 66 images | YOLOv8n | 50 | 48.5% | Optimized |
-| v3 | 246 images | YOLOv8s | 100 | **[TBD]%** | Production |
+| v3 | 246 images | YOLOv8s | 100 | **75.1%** ✅ | **Production** |
 
 ### 📈 Performance Metrics (v3)
 ```
-Overall mAP@50: [TBD]%
-Precision: [TBD]%
-Recall: [TBD]%
-Inference Speed: ~1.3ms per image (real-time capable)
+Overall mAP@50: 75.1% ✅ (exceeds 70% target!)
+Precision: 73.5%
+Recall: 72.1%
+Inference Speed: ~3.8ms per image (real-time capable)
 ```
 
 ## 🏗️ Architecture
