@@ -57,8 +57,8 @@ v3 (Oct 27): 75.1% mAP → Production ready! (+340% total)
 
 | Version | Dataset Size | Model | Epochs | mAP@50 | Status |
 |---------|-------------|-------|--------|--------|--------|
-| v1 | 66 images | YOLOv8n | 10 | 17.1% | Baseline |
-| v2 | 66 images | YOLOv8n | 50 | 48.5% | Optimized |
+| v1 | 66 images | YOLOv8n | 10 | 15.8% | Baseline |
+| v2 | 66 images | YOLOv8n | 50 | 52.6% | Optimized |
 | v3 | 246 images | YOLOv8s | 100 | **75.1%** ✅ | **Production** |
 
 ### 📈 Detailed Metrics (v3 - Production Model)
