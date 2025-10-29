@@ -12,7 +12,7 @@ Build production-ready AI system to detect safety equipment (helmets, vests) on 
 - **Model:** YOLOv8n
 - **Epochs:** 10
 - **Results:**
-  - mAP@50: 17.1%
+  - mAP@50: 15.8%
   - Best class: person (78.4%)
 - **Time:** 1 minute training
 - **Key Learning:** Need more training time
@@ -22,11 +22,11 @@ Build production-ready AI system to detect safety equipment (helmets, vests) on 
 - **Model:** YOLOv8n
 - **Epochs:** 50
 - **Results:**
-  - mAP@50: 48.5%
-  - Precision: 69%
-  - Recall: 27%
+  - mAP@50: 52.6%
+  - Precision: 79.8%
+  - Recall: 46.7%
 - **Time:** 10 minutes training
-- **Improvement:** +184% from v1!
+- **Improvement:** +232.9% from v1!
 - **Key Learning:** Training time matters, but need more data
 
 #### v3 - Production (Oct 26-27, 2025)
@@ -34,9 +34,9 @@ Build production-ready AI system to detect safety equipment (helmets, vests) on 
 - **Model:** YOLOv8s (bigger!)
 - **Epochs:** 100
 - **Results:**
-  - mAP@50: [PENDING]%
-  - Precision: [PENDING]%
-  - Recall: [PENDING]%
+  - mAP@50: 75.1%
+  - Precision: 73.5%
+  - Recall: 72.1%
 - **Time:** ~25-30 minutes training
 - **Changes:**
   - 4.7x more source images
@@ -133,4 +133,3 @@ Build production-ready AI system to detect safety equipment (helmets, vests) on 
 - Evaluation: 2 hours
 - Documentation: 2-3 hours
 
-**Result:** Production-ready safety detection system with professional documentation and clear improvement trajectory.
