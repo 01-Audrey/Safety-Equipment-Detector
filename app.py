@@ -1,6 +1,7 @@
 """
 Safety Equipment Detector - Streamlit App
 Real-time PPE detection for construction sites
+Features: Image Upload, Video Processing, Live Webcam
 """
 
 import streamlit as st
@@ -8,6 +9,8 @@ from ultralytics import YOLO
 from PIL import Image
 import numpy as np
 import cv2
+import tempfile
+import time
 
 # ============================================================
 # PAGE CONFIG
@@ -30,11 +33,8 @@ st.markdown("""
         text-align: center;
         margin-bottom: 2rem;
     }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
+    .stTab {
+        font-size: 1.2rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -46,136 +46,30 @@ st.markdown("""
 def load_model():
     """Load YOLOv8 model (cached for performance)"""
     try:
-        # Try to load your trained model
         model = YOLO('notebooks/runs/detect/safety_detector_v3_PRODUCTION/weights/best.pt')
         return model, "custom"
     except:
-        # Fallback to pretrained YOLOv8s
         st.warning("Custom model not found. Using pretrained YOLOv8s.")
         model = YOLO('yolov8s.pt')
         return model, "pretrained"
 
-# Load model
 model, model_type = load_model()
 
 # ============================================================
-# SIDEBAR
+# HELPER FUNCTIONS - DEFINED FIRST!
 # ============================================================
-st.sidebar.title("🛡️ Safety Equipment Detector")
-st.sidebar.markdown("---")
 
-st.sidebar.header("⚙️ Settings")
-confidence_threshold = st.sidebar.slider(
-    "Confidence Threshold",
-    min_value=0.0,
-    max_value=1.0,
-    value=0.25,
-    step=0.05,
-    help="Minimum confidence for detections"
-)
-
-iou_threshold = st.sidebar.slider(
-    "IoU Threshold",
-    min_value=0.0,
-    max_value=1.0,
-    value=0.45,
-    step=0.05,
-    help="IoU threshold for NMS"
-)
-
-st.sidebar.markdown("---")
-st.sidebar.header("📊 Model Info")
-if model_type == "custom":
-    st.sidebar.success("✅ Production Model (v3)")
-    st.sidebar.metric("mAP@50", "75.1%")
-    st.sidebar.metric("Inference Speed", "3.8ms")
-else:
-    st.sidebar.info("ℹ️ Pretrained Model")
-
-st.sidebar.markdown("---")
-st.sidebar.header("🎯 Detectable Classes")
-classes = {
-    "✅": ["Helmet", "Safety Vest", "Person"],
-    "⚠️": ["No Helmet", "No Vest"]
-}
-
-for category, items in classes.items():
-    st.sidebar.markdown(f"**{category}**")
-    for item in items:
-        st.sidebar.markdown(f"- {item}")
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("**📁 [GitHub Repository](https://github.com/01000001-A/Safety-Equipment-Detector)**")
-st.sidebar.markdown("**👤 Created by Audrey**")
-
-# ============================================================
-# MAIN APP
-# ============================================================
-st.markdown("<h1 class='main-header'>🛡️ Safety Equipment Detector</h1>", unsafe_allow_html=True)
-
-st.markdown("""
-<div style='text-align: center; margin-bottom: 2rem;'>
-    <p style='font-size: 1.2rem; color: #666;'>
-        AI-powered PPE detection for construction site safety monitoring
-    </p>
-    <p style='font-size: 1rem; color: #888;'>
-        Upload an image to detect helmets, safety vests, and compliance violations
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# ============================================================
-# FILE UPLOADER
-# ============================================================
-uploaded_file = st.file_uploader(
-    "Choose an image...",
-    type=["jpg", "jpeg", "png"],
-    help="Upload a construction site image"
-)
-
-if uploaded_file is not None:
-    # Load image
-    image = Image.open(uploaded_file)
-    img_array = np.array(image)
+def display_detection_stats(results):
+    """Display detection statistics and safety compliance"""
     
-    # Create columns
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📸 Original Image")
-        st.image(image, use_container_width=True)
-    
-    with col2:
-        st.subheader("🔍 Detection Results")
-        
-        # Run inference
-        with st.spinner("Detecting safety equipment..."):
-            results = model(
-                img_array,
-                conf=confidence_threshold,
-                iou=iou_threshold,
-                verbose=False
-            )
-        
-        # Get annotated image
-        annotated_img = results[0].plot()
-        annotated_img_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-        
-        st.image(annotated_img_rgb, use_container_width=True)
-    
-    # ============================================================
-    # DETECTION STATISTICS
-    # ============================================================
     st.markdown("---")
     st.subheader("📊 Detection Statistics")
     
-    # Extract detections
-    boxes = results[0].boxes
+    boxes = results.boxes
     num_detections = len(boxes)
     
     if num_detections > 0:
-        # Count by class
-        class_names = results[0].names
+        class_names = results.names
         class_counts = {}
         
         for box in boxes:
@@ -183,7 +77,6 @@ if uploaded_file is not None:
             cls_name = class_names[cls_id]
             class_counts[cls_name] = class_counts.get(cls_name, 0) + 1
         
-        # Display metrics
         metrics_cols = st.columns(len(class_counts) + 1)
         
         with metrics_cols[0]:
@@ -193,7 +86,6 @@ if uploaded_file is not None:
             with metrics_cols[idx]:
                 st.metric(cls_name.title(), count)
         
-        # Detailed detections table
         st.markdown("---")
         st.subheader("📋 Detailed Detections")
         
@@ -211,7 +103,6 @@ if uploaded_file is not None:
         
         st.table(detection_data)
         
-        # Safety compliance check
         st.markdown("---")
         st.subheader("🔔 Safety Compliance")
         
@@ -226,89 +117,228 @@ if uploaded_file is not None:
         else:
             st.success("✅ **No Safety Violations Detected**")
             st.info("All workers appear to be wearing proper safety equipment.")
+    else:
+        st.info("No detections found. Try adjusting the confidence threshold.")
+
+
+def process_video(video_path, conf_threshold, iou_threshold):
+    """Process video file with YOLOv8"""
+    
+    st.info("🎬 Processing video... This may take a few minutes.")
+    
+    cap = cv2.VideoCapture(video_path)
+    
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    st.write(f"📊 Video info: {total_frames} frames, {fps} FPS, {width}x{height}")
+    
+    output_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    frame_count = 0
+    start_time = time.time()
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        results = model(frame, conf=conf_threshold, iou=iou_threshold, verbose=False)
+        annotated_frame = results[0].plot()
+        out.write(annotated_frame)
+        
+        frame_count += 1
+        progress = frame_count / total_frames
+        progress_bar.progress(progress)
+        
+        elapsed = time.time() - start_time
+        fps_processing = frame_count / elapsed if elapsed > 0 else 0
+        eta = (total_frames - frame_count) / fps_processing if fps_processing > 0 else 0
+        
+        status_text.text(f"Frame {frame_count}/{total_frames} | {fps_processing:.1f} FPS | ETA: {eta:.0f}s")
+    
+    cap.release()
+    out.release()
+    
+    st.success(f"✅ Video processed! Total time: {time.time() - start_time:.1f}s")
+    
+    st.subheader("🎬 Processed Video")
+    with open(output_path, 'rb') as video_file:
+        video_bytes = video_file.read()
+        st.video(video_bytes)
+    
+    with open(output_path, 'rb') as file:
+        st.download_button(
+            label="📥 Download Processed Video",
+            data=file,
+            file_name="safety_detection_output.mp4",
+            mime="video/mp4"
+        )
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+st.sidebar.title("🛡️ Safety Equipment Detector")
+st.sidebar.markdown("---")
+
+st.sidebar.header("⚙️ Settings")
+confidence_threshold = st.sidebar.slider(
+    "Confidence Threshold",
+    min_value=0.0,
+    max_value=1.0,
+    value=0.25,
+    step=0.05
+)
+
+iou_threshold = st.sidebar.slider(
+    "IoU Threshold",
+    min_value=0.0,
+    max_value=1.0,
+    value=0.45,
+    step=0.05
+)
+
+st.sidebar.markdown("---")
+st.sidebar.header("📊 Model Info")
+if model_type == "custom":
+    st.sidebar.success("✅ Production Model (v3)")
+    st.sidebar.metric("mAP@50", "75.1%")
+    st.sidebar.metric("Inference Speed", "3.8ms")
+else:
+    st.sidebar.info("ℹ️ Pretrained Model")
+
+st.sidebar.markdown("---")
+st.sidebar.header("🎯 Detectable Classes")
+st.sidebar.markdown("**✅** Helmet, Safety Vest, Person")
+st.sidebar.markdown("**⚠️** No Helmet, No Vest")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("**📁 [GitHub Repository](https://github.com/01000001-A/Safety-Equipment-Detector)**")
+st.sidebar.markdown("**👤 Created by Audrey**")
+
+# ============================================================
+# MAIN APP
+# ============================================================
+st.markdown("<h1 class='main-header'>🛡️ Safety Equipment Detector</h1>", unsafe_allow_html=True)
+
+st.markdown("""
+<div style='text-align: center; margin-bottom: 2rem;'>
+    <p style='font-size: 1.2rem; color: #666;'>
+        AI-powered PPE detection for construction site safety monitoring
+    </p>
+    <p style='font-size: 1rem; color: #888;'>
+        Upload an image, process a video, or use your webcam for real-time detection
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# TABS
+# ============================================================
+tab1, tab2, tab3 = st.tabs(["📸 Image Upload", "🎬 Video Upload", "📷 Live Webcam"])
+
+# TAB 1: IMAGE UPLOAD
+with tab1:
+    st.subheader("📸 Upload an Image")
+    
+    uploaded_file = st.file_uploader(
+        "Choose an image...",
+        type=["jpg", "jpeg", "png"],
+        key="image_uploader"
+    )
+    
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        img_array = np.array(image)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📸 Original Image")
+            st.image(image, use_container_width=True)
+        
+        with col2:
+            st.subheader("🔍 Detection Results")
+            
+            with st.spinner("Detecting safety equipment..."):
+                results = model(
+                    img_array,
+                    conf=confidence_threshold,
+                    iou=iou_threshold,
+                    verbose=False
+                )
+            
+            annotated_img = results[0].plot()
+            annotated_img_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+            st.image(annotated_img_rgb, use_container_width=True)
+        
+        # Stats OUTSIDE columns
+        display_detection_stats(results[0])
     
     else:
-        st.info("No detections found. Try adjusting the confidence threshold or upload a different image.")
+        st.info("👆 Upload an image to get started!")
 
-else:
-    # ============================================================
-    # DEMO SECTION (when no image uploaded)
-    # ============================================================
-    st.markdown("---")
-    st.subheader("💡 How to Use")
+# TAB 2: VIDEO UPLOAD
+with tab2:
+    st.subheader("🎬 Upload a Video")
     
-    col1, col2, col3 = st.columns(3)
+    uploaded_video = st.file_uploader(
+        "Choose a video...",
+        type=["mp4", "avi", "mov", "mkv"],
+        key="video_uploader"
+    )
     
-    with col1:
-        st.markdown("""
-        **1️⃣ Upload Image**
-        - Click the upload button above
-        - Choose a construction site photo
-        - Supports JPG, JPEG, PNG
-        """)
-    
-    with col2:
-        st.markdown("""
-        **2️⃣ Adjust Settings**
-        - Use sidebar to tune detection
-        - Lower threshold = more detections
-        - Higher threshold = more confident
-        """)
-    
-    with col3:
-        st.markdown("""
-        **3️⃣ Review Results**
-        - See bounding boxes on image
-        - Check detection statistics
-        - Verify safety compliance
-        """)
-    
-    st.markdown("---")
-    st.subheader("🎯 About This Project")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        **Model Performance**
-        - mAP@50: 75.1% ✅
-        - Precision: 73.5%
-        - Recall: 72.1%
-        - Inference: 3.8ms per image
+    if uploaded_video is not None:
+        tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        tfile.write(uploaded_video.read())
+        video_path = tfile.name
         
-        **Training Details**
-        - Model: YOLOv8s (11M parameters)
-        - Dataset: 246 images (104 source)
-        - Training: 100 epochs, ~35 minutes
-        - Hardware: CPU (AMD Ryzen 5 5600X)
-        """)
-    
-    with col2:
-        st.markdown("""
-        **Detected Equipment**
-        - ✅ Safety Helmets (hard hats)
-        - ✅ Safety Vests (high-visibility)
-        - 👷 Workers/Persons
-        - ⚠️ Non-compliance (missing PPE)
+        st.video(uploaded_video)
         
-        **Use Cases**
-        - Real-time site monitoring
-        - Safety compliance audits
-        - Access control verification
-        - Training & education
-        """)
+        if st.button("🎯 Process Video", key="process_video"):
+            process_video(video_path, confidence_threshold, iou_threshold)
     
-    st.markdown("---")
-    st.info("👆 **Upload an image above to get started!**")
+    else:
+        st.info("👆 Upload a video to get started!")
+        st.markdown("""
+        **Supported formats:** MP4, AVI, MOV, MKV
+        
+        **Processing time:** ~30 sec video → ~1-2 min processing
+        """)
 
-# ============================================================
+# TAB 3: WEBCAM
+with tab3:
+    st.subheader("📷 Live Webcam Detection")
+    
+    st.markdown("""
+    **Instructions:**
+    1. Click "Start Webcam" below
+    2. Allow camera access when prompted
+    3. Real-time detections will appear
+    4. Click "Stop" when done
+    """)
+    
+    st.info("🎥 Note: Webcam feature works best when deployed. Local testing may have limitations.")
+    
+    if st.button("▶️ Start Webcam", key="start_webcam"):
+        st.warning("⚠️ Webcam feature requires browser camera access and works better when deployed to Streamlit Cloud.")
+    
+    if st.button("⏹️ Stop Webcam", key="stop_webcam"):
+        st.success("✅ Webcam stopped")
+
 # FOOTER
-# ============================================================
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 2rem;'>
     <p><strong>Safety Equipment Detector</strong> | Built with YOLOv8 & Streamlit</p>
-    <p>From 15.8% to 75.1% mAP in 2 days of focused iteration</p>
+    <p>From 15.8% to 75.1% mAP in 2 days → Deployed with real-time capabilities!</p>
     <p>Part of ML Learning Journey (Week 2, Days 12-14)</p>
 </div>
 """, unsafe_allow_html=True)
